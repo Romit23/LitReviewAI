@@ -1,5 +1,6 @@
 """
-Comparison Agent - Compares papers, identifies themes and relationships
+Comparison Agent - Compares papers, identifies themes and relationships.
+Uses PRIMARY Groq API key.
 """
 import logging
 from typing import Dict, List
@@ -14,7 +15,12 @@ def format_papers_for_comparison(papers: List[Dict]) -> str:
     for i, p in enumerate(papers):
         s = p.get("summary", {})
         authors = p.get("authors", [])
-        author_str = ", ".join(authors[:3]) + (" et al." if len(authors) > 3 else "")
+        if authors and isinstance(authors[0], dict):
+            author_names = [a.get("name", "") for a in authors[:3]]
+        else:
+            author_names = [str(a) for a in authors[:3]]
+        author_str = ", ".join(author_names) + (" et al." if len(authors) > 3 else "")
+
         parts.append(f"""
 Paper [{i+1}]: {p.get('title', 'Unknown')}
 Authors: {author_str}
@@ -30,15 +36,13 @@ Keywords: {', '.join(s.get('keywords', []))}
 
 
 async def run_comparison_agent(papers: List[Dict], topic: str, job_id: str, state_manager) -> Dict:
-    """
-    Comparison Agent: identifies themes, clusters, gaps, and relationships.
-    """
+    """Comparison Agent: identifies themes, clusters, gaps, and relationships."""
     state_manager.update(job_id, current_agent="⚖️ Comparison Agent", progress=55)
     state_manager.add_log(job_id, "Comparing papers and identifying research themes")
 
     papers_text = format_papers_for_comparison(papers)
 
-    # 1. Identify research themes/clusters
+    # 1. Research themes
     state_manager.add_log(job_id, "Identifying research themes...")
     themes_result = await groq_json(
         system_prompt="You are an expert academic researcher performing a systematic literature analysis.",
@@ -62,11 +66,11 @@ Return JSON:
   "dominant_methods": ["method1", "method2", "method3"],
   "common_datasets": ["dataset1", "dataset2"]
 }}""",
-        max_tokens=2000,
+        max_tokens=1500,
     )
     state_manager.update(job_id, progress=62)
 
-    # 2. Identify research gaps and future directions
+    # 2. Research gaps
     state_manager.add_log(job_id, "Identifying research gaps...")
     gaps_result = await groq_json(
         system_prompt="You are a senior researcher identifying open problems and research gaps.",
@@ -87,11 +91,11 @@ Return JSON:
   ],
   "consensus": ["agreed point 1", "agreed point 2", "agreed point 3"]
 }}""",
-        max_tokens=1500,
+        max_tokens=1200,
     )
     state_manager.update(job_id, progress=70)
 
-    # 3. Methodology comparison table
+    # 3. Methodology comparison
     state_manager.add_log(job_id, "Building methodology comparison...")
     comparison_result = await groq_json(
         system_prompt="You are an expert at comparing research methodologies.",
@@ -114,15 +118,15 @@ Create a structured comparison. Return JSON:
   "field_maturity": "emerging|developing|mature",
   "field_maturity_reasoning": "Why you assess the field at this maturity level"
 }}""",
-        max_tokens=2000,
+        max_tokens=1500,
     )
     state_manager.update(job_id, progress=75)
 
     state_manager.add_log(job_id, "Comparison analysis complete", "success")
 
     return {
-        "themes": themes_result,
-        "gaps": gaps_result,
-        "comparison": comparison_result,
+        "themes":                 themes_result,
+        "gaps":                   gaps_result,
+        "comparison":             comparison_result,
         "papers_text_for_writer": papers_text,
     }
