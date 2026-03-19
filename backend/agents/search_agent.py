@@ -295,9 +295,32 @@ Return JSON: {{"selected_indices": [0, 1, 2, ...]}}"""
 
     papers = filtered[:max_papers]
 
+    def _paper_url(p):
+        """Best available URL for viewing the paper."""
+        # Direct URL from API
+        if p.get("url"):
+            return p["url"]
+        # ArXiv abstract page
+        ids = p.get("externalIds") or {}
+        if ids.get("ArXiv"):
+            return f"https://arxiv.org/abs/{ids['ArXiv']}"
+        # DOI resolver
+        if ids.get("DOI"):
+            return f"https://doi.org/{ids['DOI']}"
+        # Semantic Scholar page
+        if p.get("paperId"):
+            return f"https://www.semanticscholar.org/paper/{p['paperId']}"
+        return ""
+
     state_manager.set_papers(
         job_id,
-        [{"title": p.get("title"), "year": p.get("year"), "paperId": p.get("paperId")} for p in papers],
+        [{
+            "title":   p.get("title"),
+            "year":    p.get("year"),
+            "paperId": p.get("paperId"),
+            "url":     _paper_url(p),
+            "venue":   p.get("venue", ""),
+        } for p in papers],
     )
     state_manager.add_log(job_id, f"Selected {len(papers)} papers for review", "success")
     state_manager.update(job_id, progress=20)
