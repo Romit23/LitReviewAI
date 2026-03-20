@@ -1,6 +1,6 @@
 fastapi
 uvicorn[standard]
-websockets>=12.0
+websockets
 httpx
 pydantic
 pypdf
